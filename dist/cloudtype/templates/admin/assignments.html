@@ -1,0 +1,78 @@
+﻿{% extends 'admin/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>과제 관리</h2>
+    <form method="post" class="form-grid">
+        <input type="hidden" name="action" value="create_assignment">
+        <label>과제 제목
+            <input name="title" required>
+        </label>
+        <label>과제 설명
+            <textarea name="description" rows="3" required></textarea>
+        </label>
+        <label>마감일
+            <input type="date" name="due_date">
+        </label>
+        <button class="btn" type="submit">과제 등록</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>등록된 과제</h3>
+    <div class="list-stack">
+        {% for assignment in assignments %}
+            <article class="card">
+                <div class="row between">
+                    <h4>{{ assignment.title }}</h4>
+                    <small>마감: {{ assignment.due_date or '미정' }}</small>
+                </div>
+                <p>{{ assignment.description }}</p>
+                <p class="muted">제출 건수: {{ assignment.submission_count }}</p>
+                <form method="post">
+                    <input type="hidden" name="action" value="delete_assignment">
+                    <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
+                    <button class="btn ghost" data-confirm="과제를 삭제할까요?" type="submit">과제 삭제</button>
+                </form>
+            </article>
+        {% else %}
+            <p>등록된 과제가 없습니다.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <h3>학생 제출/성취도 관리</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>학생</th>
+                <th>과제</th>
+                <th>성취도</th>
+                <th>상태</th>
+                <th>수정</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for submission in submissions %}
+                <tr>
+                    <td>{{ submission.student_name }} ({{ submission.student_username }})</td>
+                    <td>{{ submission.assignment_title }}</td>
+                    <td>{{ submission.progress }}%</td>
+                    <td>{{ submission.status }}</td>
+                    <td>
+                        <form method="post" class="inline-form">
+                            <input type="hidden" name="action" value="update_submission">
+                            <input type="hidden" name="submission_id" value="{{ submission.id }}">
+                            <input type="number" name="progress" min="0" max="100" value="{{ submission.progress }}">
+                            <input name="status" value="{{ submission.status }}">
+                            <button class="btn" type="submit">저장</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">학생 제출 데이터가 없습니다.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

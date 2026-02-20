@@ -1,0 +1,74 @@
+﻿{% extends 'admin/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>공지 관리</h2>
+    <form method="post" class="form-grid">
+        <input type="hidden" name="action" value="create_notice">
+        <label>제목
+            <input name="title" required>
+        </label>
+        <label>내용
+            <textarea name="content" rows="4" required></textarea>
+        </label>
+        <label class="check-row">
+            <input type="checkbox" name="is_pinned">
+            고정 공지로 등록
+        </label>
+        <button class="btn" type="submit">공지 작성</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>고정 공지</h3>
+    <div class="notice-list">
+        {% for notice in pinned_notices %}
+            <article class="notice pinned">
+                <strong>{{ notice.title }}</strong>
+                <small>{{ notice.created_at }}</small>
+                <p>{{ notice.content }}</p>
+                <div class="row">
+                    <form method="post">
+                        <input type="hidden" name="action" value="toggle_pin">
+                        <input type="hidden" name="notice_id" value="{{ notice.id }}">
+                        <button class="btn" type="submit">고정 해지</button>
+                    </form>
+                    <form method="post">
+                        <input type="hidden" name="action" value="delete_notice">
+                        <input type="hidden" name="notice_id" value="{{ notice.id }}">
+                        <button class="btn ghost" data-confirm="공지를 삭제할까요?" type="submit">삭제</button>
+                    </form>
+                </div>
+            </article>
+        {% else %}
+            <p>고정 공지가 없습니다.</p>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <h3>일반 공지 (날짜순)</h3>
+    <div class="notice-list">
+        {% for notice in regular_notices %}
+            <article class="notice">
+                <strong>{{ notice.title }}</strong>
+                <small>{{ notice.created_at }}</small>
+                <p>{{ notice.content }}</p>
+                <div class="row">
+                    <form method="post">
+                        <input type="hidden" name="action" value="toggle_pin">
+                        <input type="hidden" name="notice_id" value="{{ notice.id }}">
+                        <button class="btn" type="submit">고정 설정</button>
+                    </form>
+                    <form method="post">
+                        <input type="hidden" name="action" value="delete_notice">
+                        <input type="hidden" name="notice_id" value="{{ notice.id }}">
+                        <button class="btn ghost" data-confirm="공지를 삭제할까요?" type="submit">삭제</button>
+                    </form>
+                </div>
+            </article>
+        {% else %}
+            <p>일반 공지가 없습니다.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

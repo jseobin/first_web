@@ -1,0 +1,74 @@
+﻿{% extends 'tutoring/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>Q&A</h2>
+    {% if student_user %}
+        <form method="post" class="form-grid">
+            <label>제목
+                <input name="title" required>
+            </label>
+            <label>내용
+                <textarea name="content" rows="4" required></textarea>
+            </label>
+            <label class="check-row">
+                <input type="checkbox" name="is_public" checked>
+                질문 공개
+            </label>
+            <button class="btn" type="submit">질문 업로드</button>
+        </form>
+    {% else %}
+        <p>질문 작성/수정/삭제는 로그인 후 사용 가능합니다.</p>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h3>질문 목록</h3>
+    <div class="list-stack">
+        {% for question in questions %}
+            <article class="card">
+                <div class="row between">
+                    <h4>{{ question.title }}</h4>
+                    <small>{{ question.created_at }}</small>
+                </div>
+                <p>{{ question.content }}</p>
+                <p class="muted">작성자: {{ question.student_name }} / 상태: {{ '공개' if question.is_public else '비공개' }}</p>
+
+                {% if answers_by_question.get(question.id) %}
+                    <div class="answer-list">
+                        {% for answer in answers_by_question[question.id] %}
+                            <div class="answer-item">
+                                <strong>답변</strong> {{ answer.content }}
+                                <small>{{ answer.admin_name or answer.admin_username }} | {{ answer.created_at }}</small>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                {% if student_user and question.student_id == student_user.id %}
+                    <details>
+                        <summary>질문 수정</summary>
+                        <form method="post" action="{{ url_for('tutoring_edit_question', question_id=question.id) }}" class="form-grid">
+                            <label>제목
+                                <input name="title" value="{{ question.title }}" required>
+                            </label>
+                            <label>내용
+                                <textarea name="content" rows="3" required>{{ question.content }}</textarea>
+                            </label>
+                            <label class="check-row">
+                                <input type="checkbox" name="is_public" {% if question.is_public %}checked{% endif %}>
+                                질문 공개
+                            </label>
+                            <button class="btn" type="submit">수정</button>
+                        </form>
+                    </details>
+                    <form method="post" action="{{ url_for('tutoring_delete_question', question_id=question.id) }}">
+                        <button class="btn ghost" data-confirm="질문을 삭제할까요?" type="submit">삭제</button>
+                    </form>
+                {% endif %}
+            </article>
+        {% else %}
+            <p>등록된 질문이 없습니다.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

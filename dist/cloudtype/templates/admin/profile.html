@@ -1,0 +1,24 @@
+﻿{% extends 'admin/layout.html' %}
+{% block content %}
+<section class="panel narrow">
+    <h2>관리자 개인정보 수정</h2>
+    <form method="post" class="form-grid">
+        <label>이름
+            <input name="full_name" value="{{ admin.full_name }}" required>
+        </label>
+        <label>이메일
+            <input name="email" value="{{ admin.email or '' }}">
+        </label>
+        <label>전화번호
+            <input name="phone" value="{{ admin.phone or '' }}">
+        </label>
+        <label>소개
+            <textarea name="bio" rows="4">{{ admin.bio or '' }}</textarea>
+        </label>
+        <label>새 비밀번호
+            <input type="password" name="new_password" placeholder="변경 시에만 입력">
+        </label>
+        <button class="btn" type="submit">저장</button>
+    </form>
+</section>
+{% endblock %}
