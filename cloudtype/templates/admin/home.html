@@ -1,0 +1,85 @@
+﻿{% extends 'admin/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>HOME</h2>
+    <div class="cards stats-grid">
+        <article class="card"><h3>학생 수</h3><p>{{ counts.students }}</p></article>
+        <article class="card"><h3>질문 수</h3><p>{{ counts.questions }}</p></article>
+        <article class="card"><h3>과제 수</h3><p>{{ counts.assignments }}</p></article>
+        <article class="card"><h3>공지 수</h3><p>{{ counts.notices }}</p></article>
+    </div>
+</section>
+
+{% if admin_user and admin_user.role == 'admin' %}
+<section class="panel">
+    <h3>내 계정 라이선스 상태</h3>
+    <p>대표 관리자 승인: <strong>{{ '완료' if admin_user.approved else '대기' }}</strong></p>
+    <ul class="chip-list">
+        {% for key, label in license_menus %}
+            <li>{{ label }}: {{ '허용' if admin_can_access(key) else '제한' }}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if admin_user and admin_user.role == 'super_admin' %}
+<section class="panel">
+    <h3>관리자 계정 승인/라이선스 부여</h3>
+    <p>관리자 대표 계정에서 메뉴별 라이선스를 개별 부여합니다.</p>
+    <div class="list-stack">
+        {% for admin in managed_admins %}
+            <article class="card">
+                <h4>{{ admin.full_name }} ({{ admin.username }})</h4>
+                <form method="post" action="{{ url_for('admin_update_account', target_admin_id=admin.id) }}" class="form-grid">
+                    <label class="check-row">
+                        <input type="checkbox" name="approved" {% if admin.approved %}checked{% endif %}>
+                        계정 승인
+                    </label>
+                    {% for key, label in license_menus %}
+                        <label class="check-row">
+                            <input type="checkbox" name="license_{{ key }}" {% if license_map.get(admin.id, {}).get(key) %}checked{% endif %}>
+                            {{ label }} 라이선스
+                        </label>
+                    {% endfor %}
+                    <button class="btn" type="submit">저장</button>
+                </form>
+                <form method="post" action="{{ url_for('admin_delete_account', target_admin_id=admin.id) }}">
+                    <button class="btn ghost" data-confirm="관리자 계정을 삭제할까요?" type="submit">계정 삭제</button>
+                </form>
+            </article>
+        {% else %}
+            <p>등록된 일반 관리자 계정이 없습니다.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+<section class="panel">
+    <h3>수정/게시 이력</h3>
+    <p>Q&A, 과제, 성적, 공지, 학생 계정 관리 작업을 기록합니다.</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>시간</th>
+                <th>관리자</th>
+                <th>메뉴</th>
+                <th>작업</th>
+                <th>상세</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in activity_logs %}
+                <tr>
+                    <td>{{ log.created_at }}</td>
+                    <td>{{ log.actor_name or log.actor_username or '알 수 없음' }}</td>
+                    <td>{{ log.menu_key }}</td>
+                    <td>{{ log.action_type }}</td>
+                    <td>{{ log.detail }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="5">기록이 없습니다.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
