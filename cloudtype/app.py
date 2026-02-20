@@ -525,6 +525,11 @@ def index():
     return redirect(url_for("portfolio"))
 
 
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}, 200
+
+
 @app.route("/portfolio")
 def portfolio():
     profile = {
