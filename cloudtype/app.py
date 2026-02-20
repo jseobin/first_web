@@ -43,10 +43,10 @@ _db_initialized = False
 
 LICENSE_MENUS = [
     ("qna", "Q&A"),
-    ("assignments", "怨쇱젣"),
-    ("scores", "?깆쟻"),
-    ("notices", "怨듭?"),
-    ("student_accounts", "?숈깮 怨꾩젙 愿由?),
+    ("assignments", "과제"),
+    ("scores", "성적"),
+    ("notices", "공지"),
+    ("student_accounts", "학생 계정 관리"),
 ]
 
 TRACKED_MENUS = {"qna", "assignments", "scores", "notices", "student_accounts"}
@@ -237,7 +237,7 @@ def seed_defaults():
             (
                 "masteradmin",
                 generate_password_hash("Master123!"),
-                "???愿由ъ옄",
+                "대표 관리자",
                 "master@example.com",
                 "010-0000-0000",
             ),
@@ -259,13 +259,13 @@ def seed_defaults():
             (
                 "student1",
                 generate_password_hash("Student123!"),
-                "?띻만??,
+                "홍길동",
                 "student1@example.com",
                 "010-1111-1111",
                 20,
-                "怨좊젮??숆탳 而댄벂?고븰怨?,
-                "?뺣낫泥섎━湲곗궗",
-                "諛깆뿏?쒖? ?곗씠??遺꾩꽍??以묒떖?쇰줈 怨듬? 以묒엯?덈떎.",
+                "고려대학교 컴퓨터학과",
+                "정보처리기사",
+                "백엔드와 데이터 분석을 중심으로 공부 중입니다.",
             ),
         )
 
@@ -277,8 +277,8 @@ def seed_defaults():
             VALUES (?, ?, 1, CURRENT_TIMESTAMP, (SELECT id FROM users WHERE role = 'super_admin' LIMIT 1))
             """,
             (
-                "[怨좎젙] ?섏뾽 ?덈궡",
-                "二?2??怨쇱쇅 吏꾪뻾, 吏덈Ц? Q&A 硫붾돱瑜??댁슜??二쇱꽭??",
+                "[고정] 수업 안내",
+                "주 2회 과외 진행, 질문은 Q&A 메뉴를 이용해 주세요.",
             ),
         )
         db.execute(
@@ -287,8 +287,8 @@ def seed_defaults():
             VALUES (?, ?, 0, (SELECT id FROM users WHERE role = 'super_admin' LIMIT 1))
             """,
             (
-                "?섑뵆 怨듭?",
-                "???꾨줈?앺듃???곕え ?곗씠?곕? ?ы븿?섍퀬 ?덉뒿?덈떎.",
+                "샘플 공지",
+                "이 프로젝트는 데모 데이터를 포함하고 있습니다.",
             ),
         )
 
@@ -423,7 +423,7 @@ def student_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if get_student_user() is None:
-            flash("?숈깮 濡쒓렇?몄씠 ?꾩슂?⑸땲??", "warning")
+            flash("학생 로그인이 필요합니다.", "warning")
             return redirect(url_for("tutoring_login"))
         return view(*args, **kwargs)
 
@@ -436,19 +436,19 @@ def admin_required(menu_key=None, super_admin_only=False):
         def wrapped(*args, **kwargs):
             admin = get_admin_user()
             if admin is None:
-                flash("愿由ъ옄 濡쒓렇?몄씠 ?꾩슂?⑸땲??", "warning")
+                flash("관리자 로그인이 필요합니다.", "warning")
                 return redirect(url_for("admin_login"))
 
             if super_admin_only and admin["role"] != "super_admin":
-                flash("???愿由ъ옄 ?꾩슜 湲곕뒫?낅땲??", "danger")
+                flash("대표 관리자 전용 기능입니다.", "danger")
                 return redirect(url_for("admin_home"))
 
             if menu_key is not None and admin["role"] != "super_admin":
                 if admin["approved"] != 1:
-                    flash("???愿由ъ옄 ?뱀씤 ???댁슜 媛?ν빀?덈떎.", "warning")
+                    flash("대표 관리자 승인 후 이용 가능합니다.", "warning")
                     return redirect(url_for("admin_home"))
                 if not has_license(admin["id"], menu_key):
-                    flash("?대떦 硫붾돱 沅뚰븳(?쇱씠?좎뒪)???놁뒿?덈떎.", "danger")
+                    flash("해당 메뉴 권한(라이선스)이 없습니다.", "danger")
                     return redirect(url_for("admin_home"))
 
             return view(*args, **kwargs)
@@ -580,13 +580,13 @@ def healthz():
 @app.route("/portfolio")
 def portfolio():
     profile = {
-        "name": "?띻만??,
+        "name": "홍길동",
         "age": "20",
-        "education": "怨좊젮??숆탳 而댄벂?고븰怨??ы븰",
-        "certificates": "?뺣낫泥섎━湲곗궗, SQLD",
+        "education": "고려대학교 컴퓨터학과 재학",
+        "certificates": "정보처리기사, SQLD",
         "email": "portfolio@example.com",
         "phone": "010-1234-5678",
-        "intro": "臾몄젣瑜??앷퉴吏 ?뚭퀬?쒕뒗 媛쒕컻?먯엯?덈떎. ??諛깆뿏???곗씠??遺꾩꽍???곌껐???ㅻТ??寃곌낵瑜?留뚮벊?덈떎.",
+        "intro": "문제를 끝까지 파고드는 개발자입니다. 웹/백엔드/데이터 분석을 연결해 실무형 결과를 만듭니다.",
     }
 
     skills = [
@@ -598,16 +598,16 @@ def portfolio():
 
     projects = [
         {
-            "title": "?숈깮 怨쇱쇅 愿由??뚮옯??,
-            "summary": "吏덈Ц, 怨쇱젣, ?깆쟻, 怨듭?瑜??듯빀???숈뒿 愿由??쒕퉬??,
+            "title": "학생 과외 관리 플랫폼",
+            "summary": "질문, 과제, 성적, 공지를 통합한 학습 관리 서비스",
         },
         {
-            "title": "?곗씠???먮룞 由ы룷???쒖뒪??,
-            "summary": "Python?쇰줈 ?곗씠???섏쭛/?뺤젣 ???쒓컖??蹂닿퀬???먮룞 ?앹꽦",
+            "title": "데이터 자동 리포트 시스템",
+            "summary": "Python으로 데이터 수집/정제 후 시각화 보고서 자동 생성",
         },
         {
-            "title": "媛쒖씤 ?ы듃?대━???뱀궗?댄듃",
-            "summary": "諛섏쓳??UI? ?꾨줈?앺듃 ?꾩뭅?대툕 以묒떖?쇰줈 援ъ꽦",
+            "title": "개인 포트폴리오 웹사이트",
+            "summary": "반응형 UI와 프로젝트 아카이브 중심으로 구성",
         },
     ]
 
@@ -671,10 +671,10 @@ def tutoring_login():
 
         if student and check_password_hash(student["password_hash"], password):
             session["student_id"] = student["id"]
-            flash("?숈깮 怨꾩젙?쇰줈 濡쒓렇?명뻽?듬땲??", "success")
+            flash("학생 계정으로 로그인했습니다.", "success")
             return redirect(url_for("tutoring_home"))
 
-        flash("?꾩씠???먮뒗 鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.", "danger")
+        flash("아이디 또는 비밀번호가 올바르지 않습니다.", "danger")
 
     return render_template("tutoring/login.html")
 
@@ -682,7 +682,7 @@ def tutoring_login():
 @app.post("/tutoring/logout")
 def tutoring_logout():
     session.pop("student_id", None)
-    flash("濡쒓렇?꾩썐?덉뒿?덈떎.", "success")
+    flash("로그아웃했습니다.", "success")
     return redirect(url_for("tutoring_home"))
 
 
@@ -702,7 +702,7 @@ def tutoring_profile():
         new_password = request.form.get("new_password", "")
 
         if not full_name:
-            flash("?대쫫? ?꾩닔?낅땲??", "danger")
+            flash("이름은 필수입니다.", "danger")
             return redirect(url_for("tutoring_profile"))
 
         db = get_db()
@@ -722,7 +722,7 @@ def tutoring_profile():
             )
 
         db.commit()
-        flash("媛쒖씤?뺣낫媛 ?섏젙?섏뿀?듬땲??", "success")
+        flash("개인정보가 수정되었습니다.", "success")
         return redirect(url_for("tutoring_profile"))
 
     student = query_db("SELECT * FROM users WHERE id = ?", (student["id"],), one=True)
@@ -736,7 +736,7 @@ def tutoring_qna():
 
     if request.method == "POST":
         if student is None:
-            flash("吏덈Ц ?깅줉? 濡쒓렇????媛?ν빀?덈떎.", "warning")
+            flash("질문 등록은 로그인 후 가능합니다.", "warning")
             return redirect(url_for("tutoring_login"))
 
         title = request.form.get("title", "").strip()
@@ -744,7 +744,7 @@ def tutoring_qna():
         is_public = 1 if request.form.get("is_public") == "on" else 0
 
         if not title or not content:
-            flash("?쒕ぉ怨??댁슜??紐⑤몢 ?낅젰??二쇱꽭??", "danger")
+            flash("제목과 내용을 모두 입력해 주세요.", "danger")
             return redirect(url_for("tutoring_qna"))
 
         db = get_db()
@@ -756,7 +756,7 @@ def tutoring_qna():
             (student["id"], title, content, is_public),
         )
         db.commit()
-        flash("吏덈Ц???깅줉?섏뿀?듬땲??", "success")
+        flash("질문이 등록되었습니다.", "success")
         return redirect(url_for("tutoring_qna"))
 
     questions, answers_by_question = fetch_questions_for_student(student["id"] if student else None)
@@ -787,7 +787,7 @@ def tutoring_edit_question(question_id):
     is_public = 1 if request.form.get("is_public") == "on" else 0
 
     if not title or not content:
-        flash("?쒕ぉ怨??댁슜??紐⑤몢 ?낅젰??二쇱꽭??", "danger")
+        flash("제목과 내용을 모두 입력해 주세요.", "danger")
         return redirect(url_for("tutoring_qna"))
 
     db = get_db()
@@ -800,7 +800,7 @@ def tutoring_edit_question(question_id):
         (title, content, is_public, question_id),
     )
     db.commit()
-    flash("吏덈Ц???섏젙?섏뿀?듬땲??", "success")
+    flash("질문이 수정되었습니다.", "success")
     return redirect(url_for("tutoring_qna"))
 
 
@@ -822,7 +822,7 @@ def tutoring_delete_question(question_id):
     db = get_db()
     db.execute("DELETE FROM questions WHERE id = ?", (question_id,))
     db.commit()
-    flash("吏덈Ц????젣?섏뿀?듬땲??", "success")
+    flash("질문이 삭제되었습니다.", "success")
     return redirect(url_for("tutoring_qna"))
 
 @app.route("/tutoring/assignments", methods=["GET", "POST"])
@@ -842,7 +842,7 @@ def tutoring_assignments():
             one=True,
         )
         if assignment is None:
-            flash("議댁옱?섏? ?딅뒗 怨쇱젣?낅땲??", "danger")
+            flash("존재하지 않는 과제입니다.", "danger")
             return redirect(url_for("tutoring_assignments"))
 
         db = get_db()
@@ -860,7 +860,7 @@ def tutoring_assignments():
             (assignment_id, student["id"], content, progress, status),
         )
         db.commit()
-        flash("怨쇱젣 ?쒖텧/?섏젙???꾨즺?섏뿀?듬땲??", "success")
+        flash("과제 제출/수정이 완료되었습니다.", "success")
         return redirect(url_for("tutoring_assignments"))
 
     assignments = query_db(
@@ -1013,12 +1013,12 @@ def admin_login():
         if admin and check_password_hash(admin["password_hash"], password):
             session["admin_id"] = admin["id"]
             if admin["role"] == "admin" and admin["approved"] != 1:
-                flash("怨꾩젙? ?앹꽦?섏뿀吏留????愿由ъ옄 ?뱀씤 ?湲?以묒엯?덈떎.", "warning")
+                flash("계정은 생성되었지만 대표 관리자 승인 대기 중입니다.", "warning")
             else:
-                flash("愿由ъ옄 濡쒓렇???깃났", "success")
+                flash("관리자 로그인 성공", "success")
             return redirect(url_for("admin_home"))
 
-        flash("?꾩씠???먮뒗 鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.", "danger")
+        flash("아이디 또는 비밀번호가 올바르지 않습니다.", "danger")
 
     return render_template("admin/login.html")
 
@@ -1032,12 +1032,12 @@ def admin_register():
     phone = request.form.get("phone", "").strip()
 
     if not username or not password or not full_name:
-        flash("?꾩씠?? 鍮꾨?踰덊샇, ?대쫫? ?꾩닔?낅땲??", "danger")
+        flash("아이디, 비밀번호, 이름은 필수입니다.", "danger")
         return redirect(url_for("admin_login"))
 
     existing = query_db("SELECT id FROM users WHERE username = ?", (username,), one=True)
     if existing is not None:
-        flash("?대? ?ъ슜 以묒씤 ?꾩씠?붿엯?덈떎.", "danger")
+        flash("이미 사용 중인 아이디입니다.", "danger")
         return redirect(url_for("admin_login"))
 
     db = get_db()
@@ -1052,14 +1052,14 @@ def admin_register():
     ensure_admin_license_rows(new_admin_id)
     db.commit()
 
-    flash("愿由ъ옄 怨꾩젙???앹꽦?섏뿀?듬땲?? ???愿由ъ옄 ?쇱씠?좎뒪 ?뱀씤 ???댁슜 媛?ν빀?덈떎.", "success")
+    flash("관리자 계정이 생성되었습니다. 대표 관리자 라이선스 승인 후 이용 가능합니다.", "success")
     return redirect(url_for("admin_login"))
 
 
 @app.post("/admin/logout")
 def admin_logout():
     session.pop("admin_id", None)
-    flash("愿由ъ옄 濡쒓렇?꾩썐 ?꾨즺", "success")
+    flash("관리자 로그아웃 완료", "success")
     return redirect(url_for("admin_login"))
 
 
@@ -1076,7 +1076,7 @@ def admin_profile():
         new_password = request.form.get("new_password", "")
 
         if not full_name:
-            flash("?대쫫? ?꾩닔?낅땲??", "danger")
+            flash("이름은 필수입니다.", "danger")
             return redirect(url_for("admin_profile"))
 
         db = get_db()
@@ -1096,7 +1096,7 @@ def admin_profile():
             )
 
         db.commit()
-        flash("愿由ъ옄 媛쒖씤?뺣낫媛 ?섏젙?섏뿀?듬땲??", "success")
+        flash("관리자 개인정보가 수정되었습니다.", "success")
         return redirect(url_for("admin_profile"))
 
     admin = query_db("SELECT * FROM users WHERE id = ?", (admin["id"],), one=True)
@@ -1113,7 +1113,7 @@ def admin_update_account(target_admin_id):
         one=True,
     )
     if target is None:
-        flash("???愿由ъ옄 怨꾩젙??李얠쓣 ???놁뒿?덈떎.", "danger")
+        flash("대상 관리자 계정을 찾을 수 없습니다.", "danger")
         return redirect(url_for("admin_home"))
 
     approved = 1 if request.form.get("approved") == "on" else 0
@@ -1140,15 +1140,15 @@ def admin_update_account(target_admin_id):
     db.commit()
     g.pop(f"admin_license_map_{target_admin_id}", None)
 
-    state_text = "?뱀씤" if approved == 1 else "誘몄듅??
+    state_text = "승인" if approved == 1 else "미승인"
     log_admin_action(
         "student_accounts",
         "license_update",
         "admin_account",
         target_admin_id,
-        f"{target['username']} ?곹깭:{state_text}",
+        f"{target['username']} 상태:{state_text}",
     )
-    flash("愿由ъ옄 ?쇱씠?좎뒪/?뱀씤 ?곹깭媛 ?낅뜲?댄듃?섏뿀?듬땲??", "success")
+    flash("관리자 라이선스/승인 상태가 업데이트되었습니다.", "success")
     return redirect(url_for("admin_home"))
 
 
@@ -1157,7 +1157,7 @@ def admin_update_account(target_admin_id):
 def admin_delete_account(target_admin_id):
     admin = get_admin_user()
     if admin["id"] == target_admin_id:
-        flash("?꾩옱 濡쒓렇?명븳 ???愿由ъ옄 怨꾩젙? ??젣?????놁뒿?덈떎.", "danger")
+        flash("현재 로그인한 대표 관리자 계정은 삭제할 수 없습니다.", "danger")
         return redirect(url_for("admin_home"))
 
     target = query_db(
@@ -1166,7 +1166,7 @@ def admin_delete_account(target_admin_id):
         one=True,
     )
     if target is None:
-        flash("??젣??愿由ъ옄 怨꾩젙??李얠쓣 ???놁뒿?덈떎.", "danger")
+        flash("삭제할 관리자 계정을 찾을 수 없습니다.", "danger")
         return redirect(url_for("admin_home"))
 
     db = get_db()
@@ -1178,9 +1178,9 @@ def admin_delete_account(target_admin_id):
         "delete_admin",
         "admin_account",
         target_admin_id,
-        f"{target['username']} ??젣",
+        f"{target['username']} 삭제",
     )
-    flash("愿由ъ옄 怨꾩젙????젣?섏뿀?듬땲??", "success")
+    flash("관리자 계정이 삭제되었습니다.", "success")
     return redirect(url_for("admin_home"))
 
 
@@ -1197,7 +1197,7 @@ def admin_qna():
             question = query_db("SELECT * FROM questions WHERE id = ?", (question_id,), one=True)
 
             if question is None or not content:
-                flash("吏덈Ц???녾굅???듬? ?댁슜??鍮꾩뼱 ?덉뒿?덈떎.", "danger")
+                flash("질문이 없거나 답변 내용이 비어 있습니다.", "danger")
                 return redirect(url_for("admin_qna"))
 
             admin = get_admin_user()
@@ -1209,30 +1209,30 @@ def admin_qna():
                 (question_id, admin["id"], content),
             )
             db.commit()
-            log_admin_action("qna", "answer", "question", question_id, "吏덈Ц ?듬? ?깅줉")
-            flash("?듬????깅줉?섏뿀?듬땲??", "success")
+            log_admin_action("qna", "answer", "question", question_id, "질문 답변 등록")
+            flash("답변이 등록되었습니다.", "success")
 
         elif action == "delete_question":
             question_id = as_int(request.form.get("question_id"), 0)
             question = query_db("SELECT id FROM questions WHERE id = ?", (question_id,), one=True)
             if question is None:
-                flash("吏덈Ц??李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("질문을 찾을 수 없습니다.", "danger")
             else:
                 db.execute("DELETE FROM questions WHERE id = ?", (question_id,))
                 db.commit()
-                log_admin_action("qna", "delete_question", "question", question_id, "吏덈Ц ??젣")
-                flash("吏덈Ц????젣?섏뿀?듬땲??", "success")
+                log_admin_action("qna", "delete_question", "question", question_id, "질문 삭제")
+                flash("질문이 삭제되었습니다.", "success")
 
         elif action == "delete_answer":
             answer_id = as_int(request.form.get("answer_id"), 0)
             answer = query_db("SELECT * FROM question_answers WHERE id = ?", (answer_id,), one=True)
             if answer is None:
-                flash("?듬???李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("답변을 찾을 수 없습니다.", "danger")
             else:
                 db.execute("DELETE FROM question_answers WHERE id = ?", (answer_id,))
                 db.commit()
-                log_admin_action("qna", "delete_answer", "answer", answer_id, "?듬? ??젣")
-                flash("?듬?????젣?섏뿀?듬땲??", "success")
+                log_admin_action("qna", "delete_answer", "answer", answer_id, "답변 삭제")
+                flash("답변이 삭제되었습니다.", "success")
 
         return redirect(url_for("admin_qna"))
 
@@ -1281,7 +1281,7 @@ def admin_assignments():
             due_date = request.form.get("due_date", "").strip() or None
 
             if not title or not description:
-                flash("怨쇱젣 ?쒕ぉ怨??ㅻ챸???낅젰??二쇱꽭??", "danger")
+                flash("과제 제목과 설명을 입력해 주세요.", "danger")
                 return redirect(url_for("admin_assignments"))
 
             admin = get_admin_user()
@@ -1294,7 +1294,7 @@ def admin_assignments():
             )
             db.commit()
             log_admin_action("assignments", "create", "assignment", cursor.lastrowid, title)
-            flash("怨쇱젣媛 ?깅줉?섏뿀?듬땲??", "success")
+            flash("과제가 등록되었습니다.", "success")
 
         elif action == "update_submission":
             submission_id = as_int(request.form.get("submission_id"), 0)
@@ -1307,7 +1307,7 @@ def admin_assignments():
                 one=True,
             )
             if submission is None:
-                flash("?쒖텧 ?뺣낫瑜?李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("제출 정보를 찾을 수 없습니다.", "danger")
             else:
                 db.execute(
                     """
@@ -1325,13 +1325,13 @@ def admin_assignments():
                     submission_id,
                     f"progress={progress}",
                 )
-                flash("?숈깮 怨쇱젣 ?깆랬?꾧? ?낅뜲?댄듃?섏뿀?듬땲??", "success")
+                flash("학생 과제 성취도가 업데이트되었습니다.", "success")
 
         elif action == "delete_assignment":
             assignment_id = as_int(request.form.get("assignment_id"), 0)
             assignment = query_db("SELECT * FROM assignments WHERE id = ?", (assignment_id,), one=True)
             if assignment is None:
-                flash("怨쇱젣瑜?李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("과제를 찾을 수 없습니다.", "danger")
             else:
                 db.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))
                 db.commit()
@@ -1342,7 +1342,7 @@ def admin_assignments():
                     assignment_id,
                     assignment["title"],
                 )
-                flash("怨쇱젣媛 ??젣?섏뿀?듬땲??", "success")
+                flash("과제가 삭제되었습니다.", "success")
 
         return redirect(url_for("admin_assignments"))
 
@@ -1401,7 +1401,7 @@ def admin_scores():
                 one=True,
             )
             if student is None or not test_name or max_score <= 0:
-                flash("?낅젰媛믪쓣 ?뺤씤??二쇱꽭??", "danger")
+                flash("입력값을 확인해 주세요.", "danger")
                 return redirect(url_for("admin_scores"))
 
             admin = get_admin_user()
@@ -1414,18 +1414,18 @@ def admin_scores():
             )
             db.commit()
             log_admin_action("scores", "announce", "score", cursor.lastrowid, test_name)
-            flash("?깆쟻???깅줉?섏뿀?듬땲??", "success")
+            flash("성적이 등록되었습니다.", "success")
 
         elif action == "delete_score":
             score_id = as_int(request.form.get("score_id"), 0)
             score = query_db("SELECT * FROM scores WHERE id = ?", (score_id,), one=True)
             if score is None:
-                flash("?깆쟻 ?곗씠?곕? 李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("성적 데이터를 찾을 수 없습니다.", "danger")
             else:
                 db.execute("DELETE FROM scores WHERE id = ?", (score_id,))
                 db.commit()
                 log_admin_action("scores", "delete", "score", score_id, score["test_name"])
-                flash("?깆쟻 ?곗씠?곌? ??젣?섏뿀?듬땲??", "success")
+                flash("성적 데이터가 삭제되었습니다.", "success")
 
         return redirect(url_for("admin_scores"))
 
@@ -1459,7 +1459,7 @@ def admin_notices():
             is_pinned = 1 if request.form.get("is_pinned") == "on" else 0
 
             if not title or not content:
-                flash("?쒕ぉ怨??댁슜???낅젰??二쇱꽭??", "danger")
+                flash("제목과 내용을 입력해 주세요.", "danger")
                 return redirect(url_for("admin_notices"))
 
             admin = get_admin_user()
@@ -1472,13 +1472,13 @@ def admin_notices():
             )
             db.commit()
             log_admin_action("notices", "create", "notice", cursor.lastrowid, title)
-            flash("怨듭??ы빆???깅줉?섏뿀?듬땲??", "success")
+            flash("공지사항이 등록되었습니다.", "success")
 
         elif action == "toggle_pin":
             notice_id = as_int(request.form.get("notice_id"), 0)
             notice = query_db("SELECT * FROM notices WHERE id = ?", (notice_id,), one=True)
             if notice is None:
-                flash("怨듭?瑜?李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("공지를 찾을 수 없습니다.", "danger")
             else:
                 next_state = 0 if notice["is_pinned"] == 1 else 1
                 db.execute(
@@ -1495,18 +1495,18 @@ def admin_notices():
                 db.commit()
                 action_text = "pin" if next_state == 1 else "unpin"
                 log_admin_action("notices", action_text, "notice", notice_id, notice["title"])
-                flash("怨듭? 怨좎젙 ?곹깭媛 蹂寃쎈릺?덉뒿?덈떎.", "success")
+                flash("공지 고정 상태가 변경되었습니다.", "success")
 
         elif action == "delete_notice":
             notice_id = as_int(request.form.get("notice_id"), 0)
             notice = query_db("SELECT * FROM notices WHERE id = ?", (notice_id,), one=True)
             if notice is None:
-                flash("怨듭?瑜?李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("공지를 찾을 수 없습니다.", "danger")
             else:
                 db.execute("DELETE FROM notices WHERE id = ?", (notice_id,))
                 db.commit()
                 log_admin_action("notices", "delete", "notice", notice_id, notice["title"])
-                flash("怨듭??ы빆????젣?섏뿀?듬땲??", "success")
+                flash("공지사항이 삭제되었습니다.", "success")
 
         return redirect(url_for("admin_notices"))
 
@@ -1535,12 +1535,12 @@ def admin_students():
             education = request.form.get("education", "").strip()
 
             if not username or not password or not full_name:
-                flash("?꾩씠?? 鍮꾨?踰덊샇, ?대쫫? ?꾩닔?낅땲??", "danger")
+                flash("아이디, 비밀번호, 이름은 필수입니다.", "danger")
                 return redirect(url_for("admin_students"))
 
             duplicate = query_db("SELECT id FROM users WHERE username = ?", (username,), one=True)
             if duplicate is not None:
-                flash("?대? ?ъ슜 以묒씤 ?숈깮 ?꾩씠?붿엯?덈떎.", "danger")
+                flash("이미 사용 중인 학생 아이디입니다.", "danger")
                 return redirect(url_for("admin_students"))
 
             cursor = db.execute(
@@ -1552,7 +1552,7 @@ def admin_students():
             )
             db.commit()
             log_admin_action("student_accounts", "create", "student", cursor.lastrowid, username)
-            flash("?숈깮 怨꾩젙???앹꽦?섏뿀?듬땲??", "success")
+            flash("학생 계정이 생성되었습니다.", "success")
 
         elif action == "update_student":
             student_id = as_int(request.form.get("student_id"), 0)
@@ -1571,7 +1571,7 @@ def admin_students():
                 one=True,
             )
             if target is None:
-                flash("?숈깮 怨꾩젙??李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("학생 계정을 찾을 수 없습니다.", "danger")
                 return redirect(url_for("admin_students"))
 
             db.execute(
@@ -1589,7 +1589,7 @@ def admin_students():
                 )
             db.commit()
             log_admin_action("student_accounts", "update", "student", student_id, target["username"])
-            flash("?숈깮 ?뺣낫媛 ?섏젙?섏뿀?듬땲??", "success")
+            flash("학생 정보가 수정되었습니다.", "success")
 
         elif action == "delete_student":
             student_id = as_int(request.form.get("student_id"), 0)
@@ -1599,12 +1599,12 @@ def admin_students():
                 one=True,
             )
             if target is None:
-                flash("?숈깮 怨꾩젙??李얠쓣 ???놁뒿?덈떎.", "danger")
+                flash("학생 계정을 찾을 수 없습니다.", "danger")
             else:
                 db.execute("DELETE FROM users WHERE id = ?", (student_id,))
                 db.commit()
                 log_admin_action("student_accounts", "delete", "student", student_id, target["username"])
-                flash("?숈깮 怨꾩젙????젣?섏뿀?듬땲??", "success")
+                flash("학생 계정이 삭제되었습니다.", "success")
 
         return redirect(url_for("admin_students"))
 
@@ -1622,12 +1622,12 @@ def admin_students():
 
 @app.errorhandler(403)
 def forbidden(_error):
-    return render_template("error.html", title="403 Forbidden", message="?묎렐 沅뚰븳???놁뒿?덈떎."), 403
+    return render_template("error.html", title="403 Forbidden", message="접근 권한이 없습니다."), 403
 
 
 @app.errorhandler(404)
 def page_not_found(_error):
-    return render_template("error.html", title="404 Not Found", message="?붿껌???섏씠吏瑜?李얠쓣 ???놁뒿?덈떎."), 404
+    return render_template("error.html", title="404 Not Found", message="요청한 페이지를 찾을 수 없습니다."), 404
 
 
 if __name__ == "__main__":
