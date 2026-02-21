@@ -11,36 +11,6 @@ function setText(selector, value) {
     }
 }
 
-async function renderBackendStatus() {
-    const statusElement = document.querySelector('[data-api-status]');
-    if (!statusElement) {
-        return;
-    }
-
-    statusElement.textContent = 'Backend: checking...';
-
-    try {
-        const response = await fetch(apiUrl('/api/healthz'), {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const payload = await response.json();
-        const service = payload.service || 'backend';
-        statusElement.textContent = `Backend: connected (${service})`;
-        statusElement.classList.add('is-ok');
-        statusElement.classList.remove('is-error');
-    } catch (_error) {
-        statusElement.textContent = 'Backend: connection failed';
-        statusElement.classList.add('is-error');
-        statusElement.classList.remove('is-ok');
-    }
-}
-
 async function hydratePortfolioFromApi() {
     if (!document.querySelector('[data-portfolio-from-api]')) {
         return;
@@ -127,5 +97,4 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     });
 });
 
-void renderBackendStatus();
 void hydratePortfolioFromApi();
