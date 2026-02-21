@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import tempfile
 import threading
@@ -8,12 +9,36 @@ from functools import wraps
 from flask import Flask, abort, flash, g, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except Exception:  # pragma: no cover - optional dependency for postgres deployment
+    psycopg2 = None
+    RealDictCursor = None
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret-key")
-app.config["DATABASE"] = os.environ.get(
-    "DATABASE_PATH",
-    os.path.join(app.root_path, "portfolio.sqlite3"),
-)
+database_url = os.environ.get("DATABASE_URL", "").strip()
+if database_url.startswith("postgres://"):
+    database_url = "postgresql://" + database_url[len("postgres://") :]
+app.config["DATABASE_URL"] = database_url
+app.config["USE_POSTGRES"] = bool(database_url)
+
+
+def _resolve_database_path():
+    explicit_path = os.environ.get("DATABASE_PATH", "").strip()
+    if explicit_path:
+        return explicit_path
+
+    # Cloudtype Volume path (default mount) fallback.
+    volume_path = os.environ.get("VOLUME_PATH", "/data").strip() or "/data"
+    if os.path.isdir(volume_path):
+        return os.path.join(volume_path, "portfolio.sqlite3")
+
+    return os.path.join(app.root_path, "portfolio.sqlite3")
+
+
+app.config["DATABASE"] = _resolve_database_path() if not app.config["USE_POSTGRES"] else ""
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.config["CORS_ALLOW_ORIGIN"] = os.environ.get("CORS_ALLOW_ORIGIN", "*")
@@ -53,7 +78,7 @@ LICENSE_MENUS = [
 TRACKED_MENUS = {"qna", "assignments", "scores", "notices", "student_accounts"}
 TRACKED_MENU_KEYS = tuple(sorted(TRACKED_MENUS))
 
-SCHEMA_SQL = """
+SCHEMA_SQL_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -176,26 +201,143 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_menu_created_at ON audit_logs (menu_ke
 """
 
 
+def _sqlite_schema_to_postgres(schema_sql):
+    schema = schema_sql
+    schema = schema.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+    schema = schema.replace("created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP", "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    schema = schema.replace("updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP", "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
+    schema = schema.replace("pinned_at TEXT,", "pinned_at TIMESTAMP,")
+    return schema
+
+
+SCHEMA_SQL_POSTGRES = _sqlite_schema_to_postgres(SCHEMA_SQL_SQLITE)
+SCHEMA_SQL = SCHEMA_SQL_POSTGRES if app.config["USE_POSTGRES"] else SCHEMA_SQL_SQLITE
+
+
+def _split_sql_script(sql_script):
+    return [statement.strip() for statement in sql_script.split(";") if statement.strip()]
+
+
+def _is_postgres_insert(query):
+    return bool(re.match(r"^\s*INSERT\s+INTO\s+", query, flags=re.IGNORECASE))
+
+
+def _adapt_query_for_postgres(query):
+    translated = query
+    used_insert_ignore = bool(re.match(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", translated, flags=re.IGNORECASE))
+    if used_insert_ignore:
+        translated = re.sub(
+            r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+",
+            "INSERT INTO ",
+            translated,
+            flags=re.IGNORECASE,
+        )
+    translated = translated.replace("?", "%s")
+    if used_insert_ignore:
+        translated = translated.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+
+    needs_returning_id = _is_postgres_insert(translated) and "RETURNING" not in translated.upper()
+    if needs_returning_id:
+        translated = translated.rstrip().rstrip(";") + " RETURNING id"
+
+    return translated, needs_returning_id
+
+
+class CursorResult:
+    def __init__(self, cursor=None, lastrowid=None):
+        self._cursor = cursor
+        self.lastrowid = lastrowid
+
+    def fetchall(self):
+        if self._cursor is None:
+            return []
+        return self._cursor.fetchall()
+
+    def fetchone(self):
+        if self._cursor is None:
+            return None
+        return self._cursor.fetchone()
+
+    def close(self):
+        if self._cursor is not None:
+            self._cursor.close()
+            self._cursor = None
+
+
+class PostgresConnectionWrapper:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, query, args=()):
+        sql, needs_returning_id = _adapt_query_for_postgres(query)
+        cursor = self.connection.cursor()
+        cursor.execute(sql, args)
+        if not needs_returning_id:
+            return CursorResult(cursor=cursor)
+
+        row = cursor.fetchone()
+        lastrowid = None
+        if row is not None:
+            if isinstance(row, dict):
+                lastrowid = row.get("id")
+            elif isinstance(row, (list, tuple)) and row:
+                lastrowid = row[0]
+            elif hasattr(row, "get"):
+                lastrowid = row.get("id")
+        cursor.close()
+        return CursorResult(lastrowid=lastrowid)
+
+    def executescript(self, sql_script):
+        cursor = self.connection.cursor()
+        try:
+            for statement in _split_sql_script(sql_script):
+                cursor.execute(statement)
+        finally:
+            cursor.close()
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
+
+
+_db_operational_errors = [sqlite3.OperationalError]
+if psycopg2 is not None:
+    _db_operational_errors.append(psycopg2.OperationalError)
+DB_OPERATIONAL_ERRORS = tuple(_db_operational_errors)
+
+
 def get_db():
     if "db" not in g:
-        db_path = app.config["DATABASE"]
-        try:
-            connection = sqlite3.connect(db_path, timeout=10)
-        except sqlite3.OperationalError:
-            # Fallback for environments where project path may be read-only.
-            fallback = os.path.join(tempfile.gettempdir(), "portfolio.sqlite3")
-            app.config["DATABASE"] = fallback
-            connection = sqlite3.connect(fallback, timeout=10)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA busy_timeout = 5000")
-        # Sandbox/Cloud-sync environments can fail SQLite journaling writes.
-        try:
-            connection.execute("PRAGMA journal_mode = OFF")
-            connection.execute("PRAGMA synchronous = OFF")
-        except sqlite3.OperationalError:
-            pass
-        connection.execute("PRAGMA foreign_keys = ON")
-        g.db = connection
+        if app.config["USE_POSTGRES"]:
+            if psycopg2 is None:
+                raise RuntimeError("DATABASE_URL is set but psycopg2 is not installed.")
+            connection = psycopg2.connect(app.config["DATABASE_URL"], cursor_factory=RealDictCursor)
+            connection.autocommit = False
+            g.db = PostgresConnectionWrapper(connection)
+        else:
+            db_path = app.config["DATABASE"]
+            try:
+                parent_dir = os.path.dirname(os.path.abspath(db_path))
+                if parent_dir:
+                    os.makedirs(parent_dir, exist_ok=True)
+                connection = sqlite3.connect(db_path, timeout=10)
+            except (sqlite3.OperationalError, OSError):
+                # Fallback for environments where project path may be read-only.
+                fallback = os.path.join(tempfile.gettempdir(), "portfolio.sqlite3")
+                app.config["DATABASE"] = fallback
+                connection = sqlite3.connect(fallback, timeout=10)
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA busy_timeout = 5000")
+            # Sandbox/Cloud-sync environments can fail SQLite journaling writes.
+            try:
+                connection.execute("PRAGMA journal_mode = OFF")
+                connection.execute("PRAGMA synchronous = OFF")
+            except sqlite3.OperationalError:
+                pass
+            connection.execute("PRAGMA foreign_keys = ON")
+            g.db = connection
     return g.db
 
 
@@ -311,8 +453,9 @@ def ensure_db_initialized():
                 init_db()
                 _db_initialized = True
                 return
-            except sqlite3.OperationalError as exc:
-                if "locked" in str(exc).lower():
+            except DB_OPERATIONAL_ERRORS as exc:
+                lowered = str(exc).lower()
+                if "locked" in lowered or "deadlock" in lowered or "serialize" in lowered:
                     last_error = exc
                     time.sleep(0.25)
                     continue
