@@ -744,3 +744,29 @@ summary:hover {
         font-size: clamp(1.18rem, 6vw, 1.5rem);
     }
 }
+
+.api-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 0;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.06);
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.api-status.is-ok {
+    border-color: rgba(22, 163, 74, 0.45);
+    background: rgba(22, 163, 74, 0.12);
+    color: #166534;
+}
+
+.api-status.is-error {
+    border-color: rgba(220, 38, 38, 0.45);
+    background: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+}

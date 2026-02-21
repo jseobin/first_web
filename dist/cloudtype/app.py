@@ -16,6 +16,7 @@ app.config["DATABASE"] = os.environ.get(
 )
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["CORS_ALLOW_ORIGIN"] = os.environ.get("CORS_ALLOW_ORIGIN", "*")
 app.jinja_env.auto_reload = True
 
 
@@ -564,6 +565,11 @@ def disable_static_cache(response):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+    if request.path.startswith("/api/"):
+        allow_origin = app.config.get("CORS_ALLOW_ORIGIN", "*")
+        response.headers["Access-Control-Allow-Origin"] = allow_origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return response
 
 
@@ -575,6 +581,78 @@ def index():
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}, 200
+
+
+@app.route("/api/<path:_path>", methods=["OPTIONS"])
+def api_preflight(_path):
+    return "", 204
+
+
+@app.get("/api/healthz")
+def api_healthz():
+    return {
+        "status": "ok",
+        "service": "portfolio-backend",
+        "timestamp": int(time.time()),
+    }, 200
+
+
+@app.get("/api/portfolio")
+def api_portfolio():
+    return {
+        "profile": {
+            "name": "Hong Gil-dong",
+            "age": 20,
+            "education": "Korea University, Computer Science",
+            "certificates": "Engineer Information Processing, SQLD",
+            "email": "portfolio@example.com",
+            "phone": "010-1234-5678",
+            "intro": "I build practical web products with HTML, CSS, JavaScript, and Python.",
+            "location": "Seoul, KR",
+            "github": "github.com/your-id",
+        },
+        "skills": [
+            "HTML5 / CSS3 / JavaScript",
+            "Python (Flask, Pandas)",
+            "SQLite / MySQL",
+            "Git / GitHub / Notion",
+        ],
+        "projects": [
+            {
+                "title": "Tutoring Management Platform",
+                "summary": "Integrated question, assignment, score, and notice management service.",
+            },
+            {
+                "title": "Automated Data Reporting",
+                "summary": "Collect and clean data with Python, then generate visual reports.",
+            },
+            {
+                "title": "Personal Portfolio Site",
+                "summary": "Responsive UI with project archive and contact hub.",
+            },
+        ],
+    }, 200
+
+
+def _serialize_notice_row(notice):
+    return {
+        "id": notice["id"],
+        "title": notice["title"],
+        "content": notice["content"],
+        "is_pinned": bool(notice["is_pinned"]),
+        "created_at": notice["created_at"],
+        "updated_at": notice["updated_at"],
+        "admin_name": notice["admin_name"] if notice["admin_name"] else "",
+    }
+
+
+@app.get("/api/notices/public")
+def api_notices_public():
+    pinned_notices, regular_notices = fetch_notices()
+    return {
+        "pinned": [_serialize_notice_row(n) for n in pinned_notices],
+        "regular": [_serialize_notice_row(n) for n in regular_notices],
+    }, 200
 
 
 @app.route("/portfolio")
