@@ -6,6 +6,11 @@
     <p class="muted">대표 관리자 정보는 포트폴리오 공개 정보(이름, 나이, 학력, 자격증, 연락처, 소개)에도 반영됩니다.</p>
     {% endif %}
     <form method="post" class="form-grid">
+        {% if admin.role == 'super_admin' %}
+        <label>대표관리자 아이디
+            <input name="username" value="{{ admin.username }}" required>
+        </label>
+        {% endif %}
         <label>이름
             <input name="full_name" value="{{ admin.full_name }}" required>
         </label>

@@ -1448,6 +1448,7 @@ def admin_profile():
     admin = get_admin_user()
 
     if request.method == "POST":
+        username = request.form.get("username", "").strip()
         full_name = request.form.get("full_name", "").strip()
         email = request.form.get("email", "").strip()
         phone = request.form.get("phone", "").strip()
@@ -1462,6 +1463,22 @@ def admin_profile():
             flash("Name is required.", "danger")
             return redirect(url_for("admin_profile"))
 
+        next_username = admin["username"]
+        if admin["role"] == "super_admin":
+            if not username:
+                flash("Master admin username is required.", "danger")
+                return redirect(url_for("admin_profile"))
+
+            duplicate = query_db(
+                "SELECT id FROM users WHERE username = ? AND id <> ?",
+                (username, admin["id"]),
+                one=True,
+            )
+            if duplicate is not None:
+                flash("This username is already in use.", "danger")
+                return redirect(url_for("admin_profile"))
+            next_username = username
+
         if age is not None and age < 0:
             age = 0
 
@@ -1469,10 +1486,10 @@ def admin_profile():
         db.execute(
             """
             UPDATE users
-            SET full_name = ?, email = ?, phone = ?, age = ?, education = ?, certificates = ?, bio = ?, updated_at = CURRENT_TIMESTAMP
+            SET username = ?, full_name = ?, email = ?, phone = ?, age = ?, education = ?, certificates = ?, bio = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
-            (full_name, email, phone, age, education, certificates, bio, admin["id"]),
+            (next_username, full_name, email, phone, age, education, certificates, bio, admin["id"]),
         )
 
         if new_password:
