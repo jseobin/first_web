@@ -17,6 +17,9 @@
             <a href="{{ url_for('admin_scores') }}">성적</a>
             <a href="{{ url_for('admin_notices') }}">공지</a>
             <a href="{{ url_for('admin_students') }}">학생 계정 관리</a>
+            {% if admin_user and admin_user.role == 'super_admin' %}
+                <a href="{{ url_for('admin_portfolio') }}">포트폴리오 관리</a>
+            {% endif %}
             <a href="{{ url_for('admin_login') }}">관리자 로그인</a>
             {% if admin_user %}
                 <a href="{{ url_for('admin_profile') }}">개인정보</a>

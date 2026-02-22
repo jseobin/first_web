@@ -1,0 +1,66 @@
+{% extends 'admin/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>포트폴리오 전체 수정</h2>
+    <p class="muted">ABOUT ME, SKILLS, PORTFOLIO, CONTACT 내용을 한 번에 수정합니다.</p>
+
+    <form method="post" class="form-grid">
+        <h3>ABOUT ME</h3>
+        <label>이름
+            <input name="full_name" value="{{ profile.name }}" required>
+        </label>
+        <label>나이
+            <input type="number" min="0" name="age" value="{{ profile.age if profile.age is not none else '' }}">
+        </label>
+        <label>학력
+            <input name="education" value="{{ profile.education or '' }}">
+        </label>
+        <label>자격증
+            <input name="certificates" value="{{ profile.certificates or '' }}">
+        </label>
+        <label>자기소개(히어로 문구)
+            <textarea name="intro" rows="3">{{ profile.intro or '' }}</textarea>
+        </label>
+        <label>ABOUT ME 하단 문구
+            <textarea name="about_note" rows="2">{{ about_note }}</textarea>
+        </label>
+
+        <h3>SKILLS</h3>
+        <label>기술 목록 (한 줄에 하나씩)
+            <textarea name="skills" rows="6">{{ skills_text }}</textarea>
+        </label>
+        <label>SKILLS 하단 문구
+            <textarea name="skills_note" rows="2">{{ skills_note }}</textarea>
+        </label>
+
+        <h3>PORTFOLIO</h3>
+        {% for project in projects %}
+            <label>프로젝트 {{ loop.index }} 제목
+                <input name="project_title" value="{{ project.title }}">
+            </label>
+            <label>프로젝트 {{ loop.index }} 설명
+                <textarea name="project_summary" rows="2">{{ project.summary }}</textarea>
+            </label>
+        {% endfor %}
+
+        <h3>CONTACT</h3>
+        <label>Email
+            <input name="email" value="{{ profile.email or '' }}">
+        </label>
+        <label>Phone
+            <input name="phone" value="{{ profile.phone or '' }}">
+        </label>
+        <label>GitHub
+            <input name="github" value="{{ profile.github or '' }}">
+        </label>
+        <label>Location
+            <input name="location" value="{{ profile.location or '' }}">
+        </label>
+        <label>CONTACT 안내 문구
+            <textarea name="contact_note" rows="2">{{ contact_note }}</textarea>
+        </label>
+
+        <button class="btn" type="submit">포트폴리오 저장</button>
+    </form>
+</section>
+{% endblock %}

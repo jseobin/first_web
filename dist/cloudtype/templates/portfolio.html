@@ -42,7 +42,7 @@
                 <div><strong>학력</strong><p>{{ profile.education }}</p></div>
                 <div><strong>자격증</strong><p>{{ profile.certificates }}</p></div>
             </div>
-            <p class="muted">실무 문제를 구조화하고, 빠르게 동작하는 결과물로 전환하는 데 집중합니다.</p>
+            <p class="muted">{{ about_note }}</p>
         </section>
 
         <section id="skills" class="panel accent">
@@ -52,7 +52,7 @@
                     <li>{{ skill }}</li>
                 {% endfor %}
             </ul>
-            <p>주요 언어는 HTML, CSS, JavaScript, Python이며 필요 시 다른 언어/도구를 활용합니다.</p>
+            <p>{{ skills_note }}</p>
         </section>
 
         <section id="portfolio" class="panel">
@@ -69,12 +69,12 @@
 
         <section id="contact" class="panel contact-panel">
             <h2>CONTACT</h2>
-            <p>협업, 과외, 프로젝트 제안은 아래로 연락 주세요.</p>
+            <p>{{ contact_note }}</p>
             <div class="contact-grid">
                 <div><strong>Email</strong><p>{{ profile.email }}</p></div>
                 <div><strong>Phone</strong><p>{{ profile.phone }}</p></div>
-                <div><strong>GitHub</strong><p>github.com/your-id</p></div>
-                <div><strong>Location</strong><p>Seoul, KR</p></div>
+                <div><strong>GitHub</strong><p>{{ profile.github }}</p></div>
+                <div><strong>Location</strong><p>{{ profile.location }}</p></div>
             </div>
         </section>
     </main>

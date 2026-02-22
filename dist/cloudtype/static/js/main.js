@@ -35,10 +35,13 @@ async function hydratePortfolioFromApi() {
         setText('[data-about-age]', String(profile.age || ''));
         setText('[data-about-education]', profile.education);
         setText('[data-about-certificates]', profile.certificates);
+        setText('[data-about-note]', payload.about_note || '');
         setText('[data-contact-email]', profile.email);
         setText('[data-contact-phone]', profile.phone);
         setText('[data-contact-github]', profile.github);
         setText('[data-contact-location]', profile.location);
+        setText('[data-skills-note]', payload.skills_note || '');
+        setText('[data-contact-note]', payload.contact_note || '');
 
         if (Array.isArray(payload.skills)) {
             const skillsList = document.querySelector('[data-skills-list]');

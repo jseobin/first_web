@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import threading
 import time
+import json
 from functools import wraps
 from importlib import import_module
 
@@ -112,6 +113,10 @@ PORTFOLIO_DEFAULT_PROJECTS = [
         "summary": "Responsive UI with project archive and contact hub.",
     },
 ]
+
+PORTFOLIO_DEFAULT_ABOUT_NOTE = "실무 문제를 구조화하고, 빠르게 동작하는 결과물로 전환하는 데 집중합니다."
+PORTFOLIO_DEFAULT_SKILLS_NOTE = "주요 언어는 HTML, CSS, JavaScript, Python이며 필요 시 다른 언어/도구를 활용합니다."
+PORTFOLIO_DEFAULT_CONTACT_NOTE = "협업, 과외, 프로젝트 제안은 아래로 연락 주세요."
 
 SCHEMA_SQL_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
@@ -222,6 +227,18 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     FOREIGN KEY (actor_admin_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS portfolio_content (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    about_note TEXT,
+    skills_note TEXT,
+    contact_note TEXT,
+    github TEXT,
+    location TEXT,
+    skills_json TEXT NOT NULL,
+    projects_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_role_approved ON users (role, approved);
 CREATE INDEX IF NOT EXISTS idx_users_role_created_at ON users (role, created_at);
 CREATE INDEX IF NOT EXISTS idx_questions_student_created_at ON questions (student_id, created_at);
@@ -233,6 +250,7 @@ CREATE INDEX IF NOT EXISTS idx_assignment_submissions_assignment_updated_at ON a
 CREATE INDEX IF NOT EXISTS idx_scores_student_created_at ON scores (student_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_notices_pinned_created_at ON notices (is_pinned, pinned_at, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_menu_created_at ON audit_logs (menu_key, created_at);
+CREATE INDEX IF NOT EXISTS idx_portfolio_content_updated_at ON portfolio_content (updated_at);
 """
 
 
@@ -720,8 +738,123 @@ def fetch_notices():
     return pinned, regular
 
 
+def _normalize_string_list(items):
+    normalized = []
+    for item in items:
+        text = str(item).strip()
+        if text:
+            normalized.append(text)
+    return normalized
+
+
+def _normalize_projects(items):
+    normalized = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title", "")).strip()
+        summary = str(item.get("summary", "")).strip()
+        if title and summary:
+            normalized.append({"title": title, "summary": summary})
+    return normalized
+
+
+def _parse_portfolio_json(raw_json, fallback, normalize_fn):
+    if not raw_json:
+        return fallback
+
+    try:
+        parsed = json.loads(raw_json)
+    except (TypeError, ValueError):
+        return fallback
+
+    if not isinstance(parsed, list):
+        return fallback
+
+    normalized = normalize_fn(parsed)
+    return normalized if normalized else fallback
+
+
+def ensure_portfolio_content_row():
+    row = query_db(
+        "SELECT * FROM portfolio_content ORDER BY id ASC LIMIT 1",
+        one=True,
+    )
+    if row is not None:
+        return row
+
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO portfolio_content (
+            about_note,
+            skills_note,
+            contact_note,
+            github,
+            location,
+            skills_json,
+            projects_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            PORTFOLIO_DEFAULT_ABOUT_NOTE,
+            PORTFOLIO_DEFAULT_SKILLS_NOTE,
+            PORTFOLIO_DEFAULT_CONTACT_NOTE,
+            PORTFOLIO_DEFAULT_PROFILE["github"],
+            PORTFOLIO_DEFAULT_PROFILE["location"],
+            json.dumps(PORTFOLIO_DEFAULT_SKILLS, ensure_ascii=False),
+            json.dumps(PORTFOLIO_DEFAULT_PROJECTS, ensure_ascii=False),
+        ),
+    )
+    db.commit()
+    return query_db(
+        "SELECT * FROM portfolio_content ORDER BY id ASC LIMIT 1",
+        one=True,
+    )
+
+
 def build_portfolio_payload():
     profile = dict(PORTFOLIO_DEFAULT_PROFILE)
+    about_note = PORTFOLIO_DEFAULT_ABOUT_NOTE
+    skills_note = PORTFOLIO_DEFAULT_SKILLS_NOTE
+    contact_note = PORTFOLIO_DEFAULT_CONTACT_NOTE
+    skills = list(PORTFOLIO_DEFAULT_SKILLS)
+    projects = [dict(project) for project in PORTFOLIO_DEFAULT_PROJECTS]
+
+    content_row = ensure_portfolio_content_row()
+    if content_row is not None:
+        about_note_text = (content_row["about_note"] or "").strip()
+        if about_note_text:
+            about_note = about_note_text
+
+        skills_note_text = (content_row["skills_note"] or "").strip()
+        if skills_note_text:
+            skills_note = skills_note_text
+
+        contact_note_text = (content_row["contact_note"] or "").strip()
+        if contact_note_text:
+            contact_note = contact_note_text
+
+        github = (content_row["github"] or "").strip()
+        if github:
+            profile["github"] = github
+
+        location = (content_row["location"] or "").strip()
+        if location:
+            profile["location"] = location
+
+        skills = _parse_portfolio_json(
+            content_row["skills_json"],
+            list(PORTFOLIO_DEFAULT_SKILLS),
+            _normalize_string_list,
+        )
+        projects = _parse_portfolio_json(
+            content_row["projects_json"],
+            [dict(project) for project in PORTFOLIO_DEFAULT_PROJECTS],
+            _normalize_projects,
+        )
+
     owner = query_db(
         """
         SELECT full_name, age, education, certificates, email, phone, bio
@@ -763,8 +896,11 @@ def build_portfolio_payload():
 
     return {
         "profile": profile,
-        "skills": list(PORTFOLIO_DEFAULT_SKILLS),
-        "projects": [dict(project) for project in PORTFOLIO_DEFAULT_PROJECTS],
+        "skills": skills,
+        "projects": projects,
+        "about_note": about_note,
+        "skills_note": skills_note,
+        "contact_note": contact_note,
     }
 
 
@@ -856,6 +992,9 @@ def portfolio():
         profile=payload["profile"],
         skills=payload["skills"],
         projects=payload["projects"],
+        about_note=payload["about_note"],
+        skills_note=payload["skills_note"],
+        contact_note=payload["contact_note"],
     )
 
 
@@ -1349,6 +1488,149 @@ def admin_profile():
     admin = query_db("SELECT * FROM users WHERE id = ?", (admin["id"],), one=True)
     g.admin_user = admin
     return render_template("admin/profile.html", admin=admin)
+
+
+@app.route("/admin/portfolio", methods=["GET", "POST"])
+@admin_required(super_admin_only=True)
+def admin_portfolio():
+    admin = get_admin_user()
+
+    if request.method == "POST":
+        full_name = request.form.get("full_name", "").strip()
+        email = request.form.get("email", "").strip()
+        phone = request.form.get("phone", "").strip()
+        age_raw = request.form.get("age", "").strip()
+        age = as_int(age_raw, 0) if age_raw else None
+        education = request.form.get("education", "").strip()
+        certificates = request.form.get("certificates", "").strip()
+        intro = request.form.get("intro", "").strip()
+
+        about_note = request.form.get("about_note", "").strip()
+        skills_note = request.form.get("skills_note", "").strip()
+        contact_note = request.form.get("contact_note", "").strip()
+        github = request.form.get("github", "").strip()
+        location = request.form.get("location", "").strip()
+
+        skills_lines = request.form.get("skills", "")
+        skills = _normalize_string_list(skills_lines.splitlines())
+
+        project_titles = request.form.getlist("project_title")
+        project_summaries = request.form.getlist("project_summary")
+        projects = []
+        for idx, title in enumerate(project_titles):
+            summary = project_summaries[idx] if idx < len(project_summaries) else ""
+            title_text = title.strip()
+            summary_text = summary.strip()
+            if title_text and summary_text:
+                projects.append({"title": title_text, "summary": summary_text})
+
+        if not full_name:
+            flash("Name is required.", "danger")
+            return redirect(url_for("admin_portfolio"))
+
+        if age is not None and age < 0:
+            age = 0
+
+        if not skills:
+            skills = list(PORTFOLIO_DEFAULT_SKILLS)
+        if not projects:
+            projects = [dict(project) for project in PORTFOLIO_DEFAULT_PROJECTS]
+
+        db = get_db()
+        db.execute(
+            """
+            UPDATE users
+            SET
+                full_name = ?,
+                email = ?,
+                phone = ?,
+                age = ?,
+                education = ?,
+                certificates = ?,
+                bio = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (full_name, email, phone, age, education, certificates, intro, admin["id"]),
+        )
+
+        current_content = query_db(
+            "SELECT id FROM portfolio_content ORDER BY id ASC LIMIT 1",
+            one=True,
+        )
+
+        if current_content is None:
+            db.execute(
+                """
+                INSERT INTO portfolio_content (
+                    about_note,
+                    skills_note,
+                    contact_note,
+                    github,
+                    location,
+                    skills_json,
+                    projects_json,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    about_note,
+                    skills_note,
+                    contact_note,
+                    github,
+                    location,
+                    json.dumps(skills, ensure_ascii=False),
+                    json.dumps(projects, ensure_ascii=False),
+                ),
+            )
+        else:
+            db.execute(
+                """
+                UPDATE portfolio_content
+                SET
+                    about_note = ?,
+                    skills_note = ?,
+                    contact_note = ?,
+                    github = ?,
+                    location = ?,
+                    skills_json = ?,
+                    projects_json = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (
+                    about_note,
+                    skills_note,
+                    contact_note,
+                    github,
+                    location,
+                    json.dumps(skills, ensure_ascii=False),
+                    json.dumps(projects, ensure_ascii=False),
+                    current_content["id"],
+                ),
+            )
+
+        db.commit()
+        flash("Portfolio content has been updated.", "success")
+        return redirect(url_for("admin_portfolio"))
+
+    payload = build_portfolio_payload()
+    profile = payload["profile"]
+    projects = payload["projects"][:]
+    while len(projects) < 3:
+        projects.append({"title": "", "summary": ""})
+    projects = projects[:3]
+
+    return render_template(
+        "admin/portfolio.html",
+        profile=profile,
+        about_note=payload["about_note"],
+        skills_note=payload["skills_note"],
+        contact_note=payload["contact_note"],
+        skills_text="\n".join(payload["skills"]),
+        projects=projects,
+    )
 
 
 @app.post("/admin/accounts/<int:target_admin_id>/update")
