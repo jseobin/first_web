@@ -1,0 +1,32 @@
+﻿{% extends 'tutoring/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>공지</h2>
+
+    <h3>고정 공지</h3>
+    <div class="notice-list">
+        {% for notice in pinned_notices %}
+            <article class="notice pinned">
+                <strong>{{ notice.title }}</strong>
+                <small>{{ notice.created_at }}</small>
+                <p>{{ notice.content }}</p>
+            </article>
+        {% else %}
+            <p>고정 공지가 없습니다.</p>
+        {% endfor %}
+    </div>
+
+    <h3>일반 공지 (최신순)</h3>
+    <div class="notice-list">
+        {% for notice in regular_notices %}
+            <article class="notice">
+                <strong>{{ notice.title }}</strong>
+                <small>{{ notice.created_at }}</small>
+                <p>{{ notice.content }}</p>
+            </article>
+        {% else %}
+            <p>일반 공지가 없습니다.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

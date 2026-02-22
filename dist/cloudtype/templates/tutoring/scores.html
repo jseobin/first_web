@@ -1,0 +1,45 @@
+﻿{% extends 'tutoring/layout.html' %}
+{% block content %}
+<section class="panel">
+    <h2>성적</h2>
+    <div class="cards stats-grid">
+        <article class="card">
+            <h3>등록 건수</h3>
+            <p>{{ summary.total }}건</p>
+        </article>
+        <article class="card">
+            <h3>평균 점수율</h3>
+            <p>{{ '%.1f'|format(summary.avg_rate) }}%</p>
+        </article>
+        <article class="card">
+            <h3>최고 점수율</h3>
+            <p>{{ '%.1f'|format(summary.best_rate) }}%</p>
+        </article>
+    </div>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>시험명</th>
+                <th>점수</th>
+                <th>분석</th>
+                <th>등록일</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in scores %}
+                <tr>
+                    <td>{{ item.test_name }}</td>
+                    <td>{{ item.score }}/{{ item.max_score }}</td>
+                    <td>{{ item.analysis or '-' }}</td>
+                    <td>{{ item.created_at }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4">등록된 성적이 없습니다.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
