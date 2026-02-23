@@ -114,9 +114,9 @@ PORTFOLIO_DEFAULT_PROJECTS = [
     },
 ]
 
-PORTFOLIO_DEFAULT_ABOUT_NOTE = "실무 문제를 구조화하고, 빠르게 동작하는 결과물로 전환하는 데 집중합니다."
-PORTFOLIO_DEFAULT_SKILLS_NOTE = "주요 언어는 HTML, CSS, JavaScript, Python이며 필요 시 다른 언어/도구를 활용합니다."
-PORTFOLIO_DEFAULT_CONTACT_NOTE = "협업, 과외, 프로젝트 제안은 아래로 연락 주세요."
+PORTFOLIO_DEFAULT_ABOUT_NOTE = "I structure problems and turn them into fast, practical outcomes."
+PORTFOLIO_DEFAULT_SKILLS_NOTE = "Main stack: HTML, CSS, JavaScript, Python. I can use other languages/tools when needed."
+PORTFOLIO_DEFAULT_CONTACT_NOTE = "For projects, tutoring, or collaboration, please contact me below."
 
 SCHEMA_SQL_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
@@ -172,8 +172,10 @@ CREATE TABLE IF NOT EXISTS assignments (
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     due_date TEXT,
+    target_student_id INTEGER,
     created_by INTEGER,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (target_student_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
@@ -413,8 +415,38 @@ def close_db(_error):
 def init_db():
     db = get_db()
     db.executescript(SCHEMA_SQL)
+    ensure_schema_migrations()
     db.commit()
     seed_defaults()
+
+
+def ensure_schema_migrations():
+    db = get_db()
+
+    if app.config["USE_POSTGRES"]:
+        column_row = query_db(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'assignments' AND column_name = 'target_student_id'
+            LIMIT 1
+            """,
+            one=True,
+        )
+        if column_row is None:
+            db.execute("ALTER TABLE assignments ADD COLUMN target_student_id BIGINT")
+            db.commit()
+    else:
+        assignment_columns = query_db("PRAGMA table_info(assignments)")
+        column_names = {column["name"] for column in assignment_columns}
+        if "target_student_id" not in column_names:
+            db.execute("ALTER TABLE assignments ADD COLUMN target_student_id INTEGER")
+            db.commit()
+
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_assignments_target_student_created_at ON assignments (target_student_id, created_at)"
+    )
+    db.commit()
 
 
 def seed_defaults():
@@ -1050,10 +1082,10 @@ def tutoring_login():
 
         if student and check_password_hash(student["password_hash"], password):
             session["student_id"] = student["id"]
-            flash("??덇문 ?④쑴???곗쨮 嚥≪뮄??紐낅뻥??щ빍??", "success")
+            flash("Logged in.", "success")
             return redirect(url_for("tutoring_home"))
 
-        flash("?袁⑹뵠???癒?뮉 ??쑬?甕곕뜇?뉐첎? ??而?몴?? ??녿뮸??덈뼄.", "danger")
+        flash("Invalid username or password.", "danger")
 
     return render_template("tutoring/login.html")
 
@@ -1166,7 +1198,7 @@ def tutoring_edit_question(question_id):
     is_public = 1 if request.form.get("is_public") == "on" else 0
 
     if not title or not content:
-        flash("??뺛걠????곸뒠??筌뤴뫀紐???낆젾??雅뚯눘苑??", "danger")
+        flash("Title and content are required.", "danger")
         return redirect(url_for("tutoring_qna"))
 
     db = get_db()
@@ -1179,7 +1211,7 @@ def tutoring_edit_question(question_id):
         (title, content, is_public, question_id),
     )
     db.commit()
-    flash("筌욌뜄揆????륁젟??뤿???щ빍??", "success")
+    flash("Question has been updated.", "success")
     return redirect(url_for("tutoring_qna"))
 
 
@@ -1201,7 +1233,7 @@ def tutoring_delete_question(question_id):
     db = get_db()
     db.execute("DELETE FROM questions WHERE id = ?", (question_id,))
     db.commit()
-    flash("筌욌뜄揆???????뤿???щ빍??", "success")
+    flash("Question has been deleted.", "success")
     return redirect(url_for("tutoring_qna"))
 
 @app.route("/tutoring/assignments", methods=["GET", "POST"])
@@ -1216,12 +1248,16 @@ def tutoring_assignments():
         status = "completed" if progress >= 100 else "in-progress"
 
         assignment = query_db(
-            "SELECT id FROM assignments WHERE id = ?",
-            (assignment_id,),
+            """
+            SELECT id
+            FROM assignments
+            WHERE id = ? AND (target_student_id IS NULL OR target_student_id = ?)
+            """,
+            (assignment_id, student["id"]),
             one=True,
         )
         if assignment is None:
-            flash("鈺곕똻???? ??낅뮉 ?⑥눘???낅빍??", "danger")
+            flash("You can only submit assignments assigned to you.", "danger")
             return redirect(url_for("tutoring_assignments"))
 
         db = get_db()
@@ -1239,24 +1275,28 @@ def tutoring_assignments():
             (assignment_id, student["id"], content, progress, status),
         )
         db.commit()
-        flash("?⑥눘????뽱뀱/??륁젟???袁⑥┷??뤿???щ빍??", "success")
+        flash("Assignment submission has been saved.", "success")
         return redirect(url_for("tutoring_assignments"))
 
     assignments = query_db(
         """
         SELECT
             a.*,
+            u.full_name AS target_student_name,
+            u.username AS target_student_username,
             s.id AS submission_id,
             s.content AS submission_content,
             s.progress AS submission_progress,
             s.status AS submission_status,
             s.updated_at AS submission_updated_at
         FROM assignments a
+        LEFT JOIN users u ON u.id = a.target_student_id
         LEFT JOIN assignment_submissions s
             ON s.assignment_id = a.id AND s.student_id = ?
+        WHERE a.target_student_id IS NULL OR a.target_student_id = ?
         ORDER BY a.created_at DESC
         """,
-        (student["id"],),
+        (student["id"], student["id"]),
     )
 
     return render_template("tutoring/assignments.html", assignments=assignments)
@@ -1820,22 +1860,40 @@ def admin_assignments():
             title = request.form.get("title", "").strip()
             description = request.form.get("description", "").strip()
             due_date = request.form.get("due_date", "").strip() or None
+            target_student_raw = request.form.get("target_student_id", "").strip()
+
+            target_student_id = as_int(target_student_raw, 0) if target_student_raw else None
+            if target_student_id is not None and target_student_id <= 0:
+                target_student_id = None
 
             if not title or not description:
-                flash("?⑥눘????뺛걠????살구????낆젾??雅뚯눘苑??", "danger")
+                flash("Assignment title and description are required.", "danger")
                 return redirect(url_for("admin_assignments"))
+
+            target_student = None
+            if target_student_id is not None:
+                target_student = query_db(
+                    "SELECT id, username, full_name FROM users WHERE id = ? AND role = 'student'",
+                    (target_student_id,),
+                    one=True,
+                )
+                if target_student is None:
+                    flash("Selected student does not exist.", "danger")
+                    return redirect(url_for("admin_assignments"))
 
             admin = get_admin_user()
             cursor = db.execute(
                 """
-                INSERT INTO assignments (title, description, due_date, created_by)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO assignments (title, description, due_date, target_student_id, created_by)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (title, description, due_date, admin["id"]),
+                (title, description, due_date, target_student_id, admin["id"]),
             )
             db.commit()
-            log_admin_action("assignments", "create", "assignment", cursor.lastrowid, title)
-            flash("?⑥눘?ｅ첎? ?源낆쨯??뤿???щ빍??", "success")
+
+            detail = f"{title} -> {target_student['username']}" if target_student else f"{title} -> all students"
+            log_admin_action("assignments", "create", "assignment", cursor.lastrowid, detail)
+            flash("Assignment has been created.", "success")
 
         elif action == "update_submission":
             submission_id = as_int(request.form.get("submission_id"), 0)
@@ -1848,7 +1906,7 @@ def admin_assignments():
                 one=True,
             )
             if submission is None:
-                flash("??뽱뀱 ?類ｋ궖??筌≪뼚??????곷뮸??덈뼄.", "danger")
+                flash("Submission not found.", "danger")
             else:
                 db.execute(
                     """
@@ -1866,13 +1924,13 @@ def admin_assignments():
                     submission_id,
                     f"progress={progress}",
                 )
-                flash("??덇문 ?⑥눘???源녿옱?袁? ??낅쑓??꾨뱜??뤿???щ빍??", "success")
+                flash("Student assignment progress has been updated.", "success")
 
         elif action == "delete_assignment":
             assignment_id = as_int(request.form.get("assignment_id"), 0)
             assignment = query_db("SELECT * FROM assignments WHERE id = ?", (assignment_id,), one=True)
             if assignment is None:
-                flash("?⑥눘?ｇ몴?筌≪뼚??????곷뮸??덈뼄.", "danger")
+                flash("Assignment not found.", "danger")
             else:
                 db.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))
                 db.commit()
@@ -1883,20 +1941,35 @@ def admin_assignments():
                     assignment_id,
                     assignment["title"],
                 )
-                flash("?⑥눘?ｅ첎? ?????뤿???щ빍??", "success")
+                flash("Assignment has been deleted.", "success")
 
         return redirect(url_for("admin_assignments"))
+
+    students = query_db(
+        """
+        SELECT id, username, full_name
+        FROM users
+        WHERE role = 'student'
+        ORDER BY full_name ASC
+        """
+    )
 
     assignments = query_db(
         """
         SELECT
             a.*,
             u.full_name AS creator_name,
-            COUNT(s.id) AS submission_count
+            ts.full_name AS target_student_name,
+            ts.username AS target_student_username,
+            COALESCE(sc.submission_count, 0) AS submission_count
         FROM assignments a
         LEFT JOIN users u ON u.id = a.created_by
-        LEFT JOIN assignment_submissions s ON s.assignment_id = a.id
-        GROUP BY a.id
+        LEFT JOIN users ts ON ts.id = a.target_student_id
+        LEFT JOIN (
+            SELECT assignment_id, COUNT(*) AS submission_count
+            FROM assignment_submissions
+            GROUP BY assignment_id
+        ) sc ON sc.assignment_id = a.id
         ORDER BY a.created_at DESC
         """
     )
@@ -1907,16 +1980,19 @@ def admin_assignments():
             s.*,
             a.title AS assignment_title,
             st.full_name AS student_name,
-            st.username AS student_username
+            st.username AS student_username,
+            a.target_student_id
         FROM assignment_submissions s
         JOIN assignments a ON a.id = s.assignment_id
         JOIN users st ON st.id = s.student_id
+        WHERE a.target_student_id IS NULL OR a.target_student_id = s.student_id
         ORDER BY s.updated_at DESC
         """
     )
 
     return render_template(
         "admin/assignments.html",
+        students=students,
         assignments=assignments,
         submissions=submissions,
     )
@@ -1942,7 +2018,7 @@ def admin_scores():
                 one=True,
             )
             if student is None or not test_name or max_score <= 0:
-                flash("??낆젾揶쏅????類ㅼ뵥??雅뚯눘苑??", "danger")
+                flash("Please check student, test name, and max score.", "danger")
                 return redirect(url_for("admin_scores"))
 
             admin = get_admin_user()
@@ -1955,18 +2031,18 @@ def admin_scores():
             )
             db.commit()
             log_admin_action("scores", "announce", "score", cursor.lastrowid, test_name)
-            flash("?源놁읅???源낆쨯??뤿???щ빍??", "success")
+            flash("Score has been created.", "success")
 
         elif action == "delete_score":
             score_id = as_int(request.form.get("score_id"), 0)
             score = query_db("SELECT * FROM scores WHERE id = ?", (score_id,), one=True)
             if score is None:
-                flash("?源놁읅 ?怨쀬뵠?怨? 筌≪뼚??????곷뮸??덈뼄.", "danger")
+                flash("Score data was not found.", "danger")
             else:
                 db.execute("DELETE FROM scores WHERE id = ?", (score_id,))
                 db.commit()
                 log_admin_action("scores", "delete", "score", score_id, score["test_name"])
-                flash("?源놁읅 ?怨쀬뵠?怨? ?????뤿???щ빍??", "success")
+                flash("Score has been deleted.", "success")
 
         return redirect(url_for("admin_scores"))
 
