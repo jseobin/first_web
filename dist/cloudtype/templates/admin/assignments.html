@@ -13,6 +13,17 @@
         <label>마감일
             <input type="date" name="due_date">
         </label>
+        <label>대상 학생
+            <select name="target_student_id">
+                <option value="">전체 학생</option>
+                {% for student in students %}
+                    <option value="{{ student.id }}">{{ student.full_name }} ({{ student.username }})</option>
+                {% endfor %}
+            </select>
+        </label>
+        {% if not students %}
+            <p class="muted">등록된 학생 계정이 없어 개인 과제 지정이 불가합니다. 먼저 학생 계정을 생성해 주세요.</p>
+        {% endif %}
         <button class="btn" type="submit">과제 등록</button>
     </form>
 </section>
@@ -27,6 +38,14 @@
                     <small>마감: {{ assignment.due_date or '미정' }}</small>
                 </div>
                 <p>{{ assignment.description }}</p>
+                <p class="muted">
+                    대상:
+                    {% if assignment.target_student_id %}
+                        {{ assignment.target_student_name }} ({{ assignment.target_student_username }})
+                    {% else %}
+                        전체 학생
+                    {% endif %}
+                </p>
                 <p class="muted">제출 건수: {{ assignment.submission_count }}</p>
                 <form method="post">
                     <input type="hidden" name="action" value="delete_assignment">

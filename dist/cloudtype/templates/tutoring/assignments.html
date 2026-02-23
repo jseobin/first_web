@@ -11,6 +11,14 @@
                     <small>마감: {{ assignment.due_date or '미정' }}</small>
                 </div>
                 <p>{{ assignment.description }}</p>
+                <p class="muted">
+                    배정 유형:
+                    {% if assignment.target_student_id %}
+                        개인 과제
+                    {% else %}
+                        공통 과제
+                    {% endif %}
+                </p>
                 <p class="muted">나의 진행률: {{ assignment.submission_progress if assignment.submission_progress is not none else 0 }}%</p>
                 <form method="post" class="form-grid">
                     <input type="hidden" name="assignment_id" value="{{ assignment.id }}">
