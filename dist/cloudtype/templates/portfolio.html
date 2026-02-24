@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portfolio</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg', v=asset_version) }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css', v=asset_version) }}">
     <script defer src="{{ url_for('static', filename='js/main.js', v=asset_version) }}"></script>
 </head>
@@ -18,7 +19,7 @@
         </nav>
         <div class="hero-grid">
             <div class="hero-image-wrap">
-                <img src="{{ url_for('static', filename='profile-placeholder.svg') }}" alt="프로필 사진" class="hero-image">
+                <img src="{{ profile_image_url }}" alt="{{ profile.name }} profile image" class="hero-image" data-profile-image>
             </div>
             <div class="hero-text">
                 <p class="eyebrow">PORTFOLIO</p>

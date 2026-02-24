@@ -11,6 +11,13 @@ function setText(selector, value) {
     }
 }
 
+function setImageSrc(selector, value) {
+    const element = document.querySelector(selector);
+    if (element instanceof HTMLImageElement && typeof value === 'string' && value.trim()) {
+        element.src = value.trim();
+    }
+}
+
 async function hydratePortfolioFromApi() {
     if (!document.querySelector('[data-portfolio-from-api]')) {
         return;
@@ -29,6 +36,7 @@ async function hydratePortfolioFromApi() {
         const payload = await response.json();
         const profile = payload.profile || {};
 
+        setImageSrc('[data-profile-image]', payload.profile_image_url || '');
         setText('[data-profile-name]', profile.name);
         setText('[data-profile-intro]', profile.intro);
         setText('[data-about-name]', profile.name);

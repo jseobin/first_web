@@ -117,6 +117,7 @@ PORTFOLIO_DEFAULT_PROJECTS = [
 PORTFOLIO_DEFAULT_ABOUT_NOTE = "I structure problems and turn them into fast, practical outcomes."
 PORTFOLIO_DEFAULT_SKILLS_NOTE = "Main stack: HTML, CSS, JavaScript, Python. I can use other languages/tools when needed."
 PORTFOLIO_DEFAULT_CONTACT_NOTE = "For projects, tutoring, or collaboration, please contact me below."
+PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL = "/static/profile-placeholder.svg"
 
 SCHEMA_SQL_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
@@ -236,6 +237,7 @@ CREATE TABLE IF NOT EXISTS portfolio_content (
     contact_note TEXT,
     github TEXT,
     location TEXT,
+    profile_image_url TEXT,
     skills_json TEXT NOT NULL,
     projects_json TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -424,7 +426,7 @@ def ensure_schema_migrations():
     db = get_db()
 
     if app.config["USE_POSTGRES"]:
-        column_row = query_db(
+        assignment_column_row = query_db(
             """
             SELECT 1
             FROM information_schema.columns
@@ -433,14 +435,33 @@ def ensure_schema_migrations():
             """,
             one=True,
         )
-        if column_row is None:
+        if assignment_column_row is None:
             db.execute("ALTER TABLE assignments ADD COLUMN target_student_id BIGINT")
+            db.commit()
+
+        portfolio_column_row = query_db(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'portfolio_content' AND column_name = 'profile_image_url'
+            LIMIT 1
+            """,
+            one=True,
+        )
+        if portfolio_column_row is None:
+            db.execute("ALTER TABLE portfolio_content ADD COLUMN profile_image_url TEXT")
             db.commit()
     else:
         assignment_columns = query_db("PRAGMA table_info(assignments)")
         column_names = {column["name"] for column in assignment_columns}
         if "target_student_id" not in column_names:
             db.execute("ALTER TABLE assignments ADD COLUMN target_student_id INTEGER")
+            db.commit()
+
+        portfolio_columns = query_db("PRAGMA table_info(portfolio_content)")
+        portfolio_column_names = {column["name"] for column in portfolio_columns}
+        if "profile_image_url" not in portfolio_column_names:
+            db.execute("ALTER TABLE portfolio_content ADD COLUMN profile_image_url TEXT")
             db.commit()
 
     db.execute(
@@ -807,6 +828,20 @@ def _parse_portfolio_json(raw_json, fallback, normalize_fn):
     return normalized if normalized else fallback
 
 
+def normalize_profile_image_url(raw_value):
+    value = str(raw_value or "").strip()
+    if not value:
+        return PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL
+
+    if value.startswith(("http://", "https://", "data:image/", "/")):
+        return value
+
+    normalized = value.replace("\\", "/").lstrip("./")
+    if normalized.startswith("static/"):
+        return f"/{normalized}"
+    return f"/static/{normalized}"
+
+
 def ensure_portfolio_content_row():
     row = query_db(
         "SELECT * FROM portfolio_content ORDER BY id ASC LIMIT 1",
@@ -824,10 +859,11 @@ def ensure_portfolio_content_row():
             contact_note,
             github,
             location,
+            profile_image_url,
             skills_json,
             projects_json
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             PORTFOLIO_DEFAULT_ABOUT_NOTE,
@@ -835,6 +871,7 @@ def ensure_portfolio_content_row():
             PORTFOLIO_DEFAULT_CONTACT_NOTE,
             PORTFOLIO_DEFAULT_PROFILE["github"],
             PORTFOLIO_DEFAULT_PROFILE["location"],
+            PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL,
             json.dumps(PORTFOLIO_DEFAULT_SKILLS, ensure_ascii=False),
             json.dumps(PORTFOLIO_DEFAULT_PROJECTS, ensure_ascii=False),
         ),
@@ -851,6 +888,7 @@ def build_portfolio_payload():
     about_note = PORTFOLIO_DEFAULT_ABOUT_NOTE
     skills_note = PORTFOLIO_DEFAULT_SKILLS_NOTE
     contact_note = PORTFOLIO_DEFAULT_CONTACT_NOTE
+    profile_image_url = PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL
     skills = list(PORTFOLIO_DEFAULT_SKILLS)
     projects = [dict(project) for project in PORTFOLIO_DEFAULT_PROJECTS]
 
@@ -875,6 +913,8 @@ def build_portfolio_payload():
         location = (content_row["location"] or "").strip()
         if location:
             profile["location"] = location
+
+        profile_image_url = normalize_profile_image_url(content_row["profile_image_url"])
 
         skills = _parse_portfolio_json(
             content_row["skills_json"],
@@ -928,6 +968,7 @@ def build_portfolio_payload():
 
     return {
         "profile": profile,
+        "profile_image_url": profile_image_url,
         "skills": skills,
         "projects": projects,
         "about_note": about_note,
@@ -1022,6 +1063,7 @@ def portfolio():
     return render_template(
         "portfolio.html",
         profile=payload["profile"],
+        profile_image_url=payload["profile_image_url"],
         skills=payload["skills"],
         projects=payload["projects"],
         about_note=payload["about_note"],
@@ -1567,6 +1609,7 @@ def admin_portfolio():
         contact_note = request.form.get("contact_note", "").strip()
         github = request.form.get("github", "").strip()
         location = request.form.get("location", "").strip()
+        profile_image_url = normalize_profile_image_url(request.form.get("profile_image_url", ""))
 
         skills_lines = request.form.get("skills", "")
         skills = _normalize_string_list(skills_lines.splitlines())
@@ -1625,11 +1668,12 @@ def admin_portfolio():
                     contact_note,
                     github,
                     location,
+                    profile_image_url,
                     skills_json,
                     projects_json,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (
                     about_note,
@@ -1637,6 +1681,7 @@ def admin_portfolio():
                     contact_note,
                     github,
                     location,
+                    profile_image_url,
                     json.dumps(skills, ensure_ascii=False),
                     json.dumps(projects, ensure_ascii=False),
                 ),
@@ -1651,6 +1696,7 @@ def admin_portfolio():
                     contact_note = ?,
                     github = ?,
                     location = ?,
+                    profile_image_url = ?,
                     skills_json = ?,
                     projects_json = ?,
                     updated_at = CURRENT_TIMESTAMP
@@ -1662,6 +1708,7 @@ def admin_portfolio():
                     contact_note,
                     github,
                     location,
+                    profile_image_url,
                     json.dumps(skills, ensure_ascii=False),
                     json.dumps(projects, ensure_ascii=False),
                     current_content["id"],
@@ -1682,6 +1729,7 @@ def admin_portfolio():
     return render_template(
         "admin/portfolio.html",
         profile=profile,
+        profile_image_url=payload["profile_image_url"],
         about_note=payload["about_note"],
         skills_note=payload["skills_note"],
         contact_note=payload["contact_note"],
