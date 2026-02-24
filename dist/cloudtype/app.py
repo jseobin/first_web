@@ -117,7 +117,7 @@ PORTFOLIO_DEFAULT_PROJECTS = [
 PORTFOLIO_DEFAULT_ABOUT_NOTE = "I structure problems and turn them into fast, practical outcomes."
 PORTFOLIO_DEFAULT_SKILLS_NOTE = "Main stack: HTML, CSS, JavaScript, Python. I can use other languages/tools when needed."
 PORTFOLIO_DEFAULT_CONTACT_NOTE = "For projects, tutoring, or collaboration, please contact me below."
-PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL = "/static/profile-placeholder.svg"
+PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL = "/static/증명사진.jpg"
 
 SCHEMA_SQL_SQLITE = """
 CREATE TABLE IF NOT EXISTS users (
@@ -828,20 +828,6 @@ def _parse_portfolio_json(raw_json, fallback, normalize_fn):
     return normalized if normalized else fallback
 
 
-def normalize_profile_image_url(raw_value):
-    value = str(raw_value or "").strip()
-    if not value:
-        return PORTFOLIO_DEFAULT_PROFILE_IMAGE_URL
-
-    if value.startswith(("http://", "https://", "data:image/", "/")):
-        return value
-
-    normalized = value.replace("\\", "/").lstrip("./")
-    if normalized.startswith("static/"):
-        return f"/{normalized}"
-    return f"/static/{normalized}"
-
-
 def ensure_portfolio_content_row():
     row = query_db(
         "SELECT * FROM portfolio_content ORDER BY id ASC LIMIT 1",
@@ -913,8 +899,6 @@ def build_portfolio_payload():
         location = (content_row["location"] or "").strip()
         if location:
             profile["location"] = location
-
-        profile_image_url = normalize_profile_image_url(content_row["profile_image_url"])
 
         skills = _parse_portfolio_json(
             content_row["skills_json"],
@@ -1609,7 +1593,6 @@ def admin_portfolio():
         contact_note = request.form.get("contact_note", "").strip()
         github = request.form.get("github", "").strip()
         location = request.form.get("location", "").strip()
-        profile_image_url = normalize_profile_image_url(request.form.get("profile_image_url", ""))
 
         skills_lines = request.form.get("skills", "")
         skills = _normalize_string_list(skills_lines.splitlines())
@@ -1668,12 +1651,11 @@ def admin_portfolio():
                     contact_note,
                     github,
                     location,
-                    profile_image_url,
                     skills_json,
                     projects_json,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (
                     about_note,
@@ -1681,7 +1663,6 @@ def admin_portfolio():
                     contact_note,
                     github,
                     location,
-                    profile_image_url,
                     json.dumps(skills, ensure_ascii=False),
                     json.dumps(projects, ensure_ascii=False),
                 ),
@@ -1696,7 +1677,6 @@ def admin_portfolio():
                     contact_note = ?,
                     github = ?,
                     location = ?,
-                    profile_image_url = ?,
                     skills_json = ?,
                     projects_json = ?,
                     updated_at = CURRENT_TIMESTAMP
@@ -1708,7 +1688,6 @@ def admin_portfolio():
                     contact_note,
                     github,
                     location,
-                    profile_image_url,
                     json.dumps(skills, ensure_ascii=False),
                     json.dumps(projects, ensure_ascii=False),
                     current_content["id"],

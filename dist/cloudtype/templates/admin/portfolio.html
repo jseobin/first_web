@@ -2,7 +2,7 @@
 {% block content %}
 <section class="panel">
     <h2>Portfolio Content Management</h2>
-    <p class="muted">Edit ABOUT ME, SKILLS, PORTFOLIO, CONTACT, and profile image shown on /portfolio.</p>
+    <p class="muted">Edit ABOUT ME, SKILLS, PORTFOLIO, and CONTACT content shown on /portfolio.</p>
 
     <form method="post" class="form-grid">
         <h3>ABOUT ME</h3>
@@ -24,15 +24,8 @@
         <label>About Note
             <textarea name="about_note" rows="2">{{ about_note }}</textarea>
         </label>
-        <label>Profile Image URL/Path
-            <input
-                name="profile_image_url"
-                value="{{ profile_image_url or '' }}"
-                placeholder="/static/profile-placeholder.svg or https://example.com/image.jpg"
-            >
-        </label>
         <div class="card">
-            <p class="muted">Current image preview</p>
+            <p class="muted">Portfolio profile image is fixed and cannot be edited here.</p>
             <img src="{{ profile_image_url }}" alt="Current portfolio profile image" class="hero-image" style="max-width: 220px; border-radius: 12px;">
         </div>
 
