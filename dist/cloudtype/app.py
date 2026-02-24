@@ -55,6 +55,7 @@ def _compute_asset_version():
     static_candidates = (
         os.path.join(app.root_path, "static", "css", "styles.css"),
         os.path.join(app.root_path, "static", "js", "main.js"),
+        os.path.join(app.root_path, "static", "favicon.png"),
     )
     mtimes = []
     for path in static_candidates:
@@ -994,6 +995,15 @@ def disable_static_cache(response):
 @app.route("/")
 def index():
     return redirect(url_for("portfolio"))
+
+
+@app.get("/favicon.ico")
+def favicon_ico():
+    response = app.send_static_file("favicon.png")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.get("/healthz")
